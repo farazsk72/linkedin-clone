@@ -1,0 +1,15 @@
+spring.application.name: uploader-service
+
+server.servlet.context-path: /uploads
+server.port: 9050
+
+eureka.client.service-url.defaultZone: http://localhost:8761/eureka
+
+cloudinary:
+  cloud-name: dkhj1rghl
+  api-key: 293799921697652
+  api-secret: ${CLOUDINARY_API_SECRET:}
+
+gcloud:
+  storage-bucket-name: p2-cs-linkedin
+  storage-access-key: ${GCLOUD_STORAGE_ACCESS_KEY:}
