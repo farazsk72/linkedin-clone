@@ -7,6 +7,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.cors.reactive.CorsUtils;
 import org.springframework.web.server.ServerWebExchange;
 
 @Slf4j
@@ -26,14 +27,24 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
             log.info("Auth request: {}", exchange.getRequest().getURI());
 
+            // CORS preflight carries no Authorization header - let it through untouched
+            if(CorsUtils.isPreFlightRequest(exchange.getRequest())) {
+                return chain.filter(exchange);
+            }
+
             final String tokenHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
 
-            if(tokenHeader == null || !tokenHeader.startsWith("Bearer")) {
+            if(tokenHeader == null || !tokenHeader.startsWith("Bearer ")) {
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
 
-            final String token = tokenHeader.split("Bearer ")[1];
+            final String token = tokenHeader.substring("Bearer ".length()).trim();
+
+            if(token.isEmpty()) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
 
             try {
                 String userId = jwtService.getUserIdFromToken(token);

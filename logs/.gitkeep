@@ -1,0 +1,2 @@
+# Keeps the logs/ dir present so Promtail's bind mount has a target.
+# The .log files themselves are gitignored.

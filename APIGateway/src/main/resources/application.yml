@@ -1,23 +1,96 @@
-server.port: 8080
+server.port: ${SERVER_PORT:9090}
 eureka.client.service-url.defaultZone: http://localhost:8761/eureka
-jwt.secretKey: asdfuasjf9a8s7fd89ihq34kljruyf98ayshcskdhfioafsuyfdcjha890sduf
+# Same JWT_SECRET_KEY the user-service signs with - set once per environment.
+jwt.secretKey: ${JWT_SECRET_KEY:asdfuasjf9a8s7fd89ihq34kljruyf98ayshcskdhfioafsuyfdcjha890sduf}
+
+# Sliding window applied to the auth routes, per client IP. In-memory, so the
+# effective limit multiplies if more than one gateway instance runs.
+ratelimit:
+  requests: ${RATELIMIT_REQUESTS:10}
+  windowSeconds: ${RATELIMIT_WINDOW_SECONDS:60}
+
+# --- Observability (Actuator + Prometheus metrics + Zipkin tracing) ---
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,gateway
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name:api-gateway}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 
 logging:
+  # Also write to a file so Promtail can ship it to Loki.
+  file:
+    name: ${LOG_DIR:../logs}/${spring.application.name:api-gateway}.log
   level:
     org.springframework.cloud.gateway: DEBUG
     reactor.netty.http.client: DEBUG
+  # Trace/span ids in the log line, so gateway logs correlate with the trace.
+  pattern:
+    level: "%5p [${spring.application.name:api-gateway},%X{traceId:-},%X{spanId:-}]"
 
 spring:
   application.name: api-gateway
   cloud:
     gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - ${FRONTEND_ORIGIN:http://localhost:5173}
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
       routes:
-        - id: user-service
+        # Public: signup / login / refresh / logout. Rate limited because these
+        # need no credentials, so nothing else stands between a script and a
+        # password guessing loop.
+        - id: user-service-auth
           uri: ${USER_SERVICE_URI:lb://USER-SERVICE}
           predicates:
-            - Path=/api/v1/users/**
+            - Path=/api/v1/users/auth/**
           filters:
             - StripPrefix=2
+            - name: RateLimitFilter
+
+        # Authenticated: profile lookup / search
+        - id: user-service-profile
+          uri: ${USER_SERVICE_URI:lb://USER-SERVICE}
+          predicates:
+            - Path=/api/v1/users/profile/**
+          filters:
+            - StripPrefix=2
+            - name: AuthenticationFilter
+
+        # Direct messaging. Its own route because it is a distinct path prefix
+        # from /auth and /profile, both of which are already routed above.
+        - id: user-service-messages
+          uri: ${USER_SERVICE_URI:lb://USER-SERVICE}
+          predicates:
+            - Path=/api/v1/users/messages/**
+          filters:
+            - StripPrefix=2
+            - name: AuthenticationFilter
 
         - id: posts-service
           uri: ${POSTS_SERVICE_URI:lb://POSTS-SERVICE}
@@ -31,6 +104,24 @@ spring:
           uri: ${CONNECTIONS_SERVICE_URI:lb://CONNECTIONS-SERVICE}
           predicates:
             - Path=/api/v1/connections/**
+          filters:
+            - StripPrefix=2
+            - name: AuthenticationFilter
+
+        # Direct upload access, used for avatars. Post images take a different
+        # path - postsService forwards those over Feign.
+        - id: uploader-service
+          uri: ${UPLOADER_SERVICE_URI:lb://UPLOADER-SERVICE}
+          predicates:
+            - Path=/api/v1/uploads/**
+          filters:
+            - StripPrefix=2
+            - name: AuthenticationFilter
+
+        - id: notification-service
+          uri: ${NOTIFICATION_SERVICE_URI:lb://NOTIFICATION-SERVICE}
+          predicates:
+            - Path=/api/v1/notifications/**
           filters:
             - StripPrefix=2
             - name: AuthenticationFilter

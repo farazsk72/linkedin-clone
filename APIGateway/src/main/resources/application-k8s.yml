@@ -1,3 +1,7 @@
+# The k8s manifests expose 8080 (containerPort, probe, Service targetPort),
+# so keep that port in-cluster even though local dev runs on 9090.
+server.port: 8080
+
 eureka.client:
   register-with-eureka: false
   fetch-registry: false

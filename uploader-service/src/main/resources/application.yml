@@ -4,12 +4,46 @@ server.servlet.context-path: /uploads
 server.port: 9050
 
 eureka.client.service-url.defaultZone: http://localhost:8761/eureka
+# Register by IP - this host's name resolves to a .mshome.net suffix the
+# gateway cannot resolve, so lb:// lookups fail with UnknownHostException.
+eureka.instance.prefer-ip-address: true
 
+# --- Observability (Actuator + Prometheus metrics + Zipkin tracing) ---
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
+logging:
+  # Also write to a file so Promtail can ship it to Loki.
+  file:
+    name: ${LOG_DIR:../logs}/${spring.application.name}.log
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
+
+# Cloud-name and api-key are public identifiers, not secrets. The api-secret
+# and the GCP service-account key are supplied by the gitignored `local`
+# profile (application-local.yml) or by env vars in k8s - never committed here.
 cloudinary:
-  cloud-name: dkhj1rghl
-  api-key: 293799921697652
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:dkhj1rghl}
+  api-key: ${CLOUDINARY_API_KEY:293799921697652}
   api-secret: ${CLOUDINARY_API_SECRET:}
 
 gcloud:
-  storage-bucket-name: p2-cs-linkedin
+  storage-bucket-name: ${GCLOUD_STORAGE_BUCKET:p2-cs-linkedin}
   storage-access-key: ${GCLOUD_STORAGE_ACCESS_KEY:}

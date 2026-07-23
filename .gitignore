@@ -1,0 +1,7 @@
+# Local-only Spring profiles holding real credentials. Never commit these.
+**/src/main/resources/application-local.properties
+**/src/main/resources/application-local.yml
+**/src/main/resources/application-local.yaml
+
+# Aggregated log files (shipped to Loki), keep the dir but not the logs.
+/logs/*.log

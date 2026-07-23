@@ -1,0 +1,28 @@
+# Auto-provisioned so Grafana comes up already pointed at Prometheus - no
+# manual data-source setup. The URL is container-to-container, hence the
+# service name and the internal 9090 rather than the host's 9099.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  # Loki holds the aggregated logs. The derived field pulls the 32-hex trace id
+  # out of each "[service,traceId,spanId]" log line and turns it into a link to
+  # that trace in Zipkin - so you can jump from a log line to its trace, which
+  # is what ties the three signals (metrics, logs, traces) together.
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '[\w.-]+,([0-9a-f]{32}),'
+          url: 'http://localhost:9411/zipkin/traces/${__value.raw}'
+          urlDisplayLabel: 'View trace in Zipkin'

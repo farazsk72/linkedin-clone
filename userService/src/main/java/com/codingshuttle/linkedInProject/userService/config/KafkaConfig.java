@@ -11,4 +11,9 @@ public class KafkaConfig {
     public NewTopic userCreatedTopic() {
         return new NewTopic("user_created_topic", 3, (short) 1);
     }
+
+    @Bean
+    public NewTopic userUpdatedTopic() {
+        return new NewTopic("user_updated_topic", 3, (short) 1);
+    }
 }

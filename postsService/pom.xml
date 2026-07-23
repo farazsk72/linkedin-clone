@@ -29,11 +29,45 @@
 	<properties>
 		<java.version>21</java.version>
 		<spring-cloud.version>2023.0.5</spring-cloud.version>
+		<!-- Override Spring Boot 3.3's managed Testcontainers (1.19.x / docker-java
+		     3.3.x): that docker-java predates Docker Engine 29 and does not
+		     negotiate the API version, so a modern daemon (min API 1.40) rejects
+		     its ping with HTTP 400. 1.20.x bundles docker-java 3.4.x, which
+		     negotiates and connects cleanly. -->
+		<testcontainers.version>1.20.6</testcontainers.version>
 	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<!-- Observability: Prometheus metrics + Zipkin distributed tracing -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-brave</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.zipkin.reporter2</groupId>
+			<artifactId>zipkin-reporter-brave</artifactId>
+		</dependency>
+		<!-- Circuit breakers + fallbacks around the Feign calls, so a slow or
+		     down downstream (connections, uploader) degrades gracefully instead
+		     of failing the whole request. -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+		</dependency>
+		<!-- Feign's Micrometer observation support - without it a Feign call
+		     creates no observation, so no trace headers are injected and the
+		     downstream service starts a fresh trace instead of continuing this
+		     one. -->
+		<dependency>
+			<groupId>io.github.openfeign</groupId>
+			<artifactId>feign-micrometer</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -57,6 +91,22 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Testcontainers: real Postgres for the JPA slice test -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

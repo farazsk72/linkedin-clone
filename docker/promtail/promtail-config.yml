@@ -1,0 +1,29 @@
+# Promtail tails the app log files (bind-mounted from the repo-root logs/ dir,
+# where each host-run service writes <app-name>.log) and ships them to Loki.
+# The service label is derived from the filename, so it stays low-cardinality;
+# the trace id is left in the line and turned into a link at query time by
+# Grafana's derived field, rather than becoming a high-cardinality label.
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: linkedin-services
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: linkedin-services
+          __path__: /var/log/app/*.log
+    pipeline_stages:
+      # filename is like /var/log/app/posts-service.log -> service=posts-service
+      - regex:
+          source: filename
+          expression: '(?P<service>[^/\\]+)\.log$'
+      - labels:
+          service:

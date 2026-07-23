@@ -18,4 +18,13 @@ public class PersonService {
         personRepository.save(person);
     }
 
+    public void updatePersonName(Long userId, String name) {
+        // A missing node is not an error worth failing the listener over - the
+        // user_created event may simply not have landed yet.
+        personRepository.findByUserId(userId).ifPresentOrElse(person -> {
+            person.setName(name);
+            personRepository.save(person);
+        }, () -> log.warn("No Person node for userId {}, skipping name update", userId));
+    }
+
 }

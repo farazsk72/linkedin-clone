@@ -19,4 +19,11 @@ public class UploaderController {
         String url = uploaderService.upload(file);
         return ResponseEntity.ok(url);
     }
+
+    /** Compensation target for the post-creation saga's upload step. */
+    @DeleteMapping
+    ResponseEntity<Void> deleteFile(@RequestParam("url") String url) {
+        uploaderService.delete(url);
+        return ResponseEntity.noContent().build();
+    }
 }

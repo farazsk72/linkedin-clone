@@ -13,4 +13,8 @@ public interface UploaderServiceClient {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<String> uploadFile(@RequestPart("file") MultipartFile file);
+
+    /** Saga compensation: delete a previously uploaded file by its URL. */
+    @org.springframework.web.bind.annotation.DeleteMapping
+    void deleteFile(@org.springframework.web.bind.annotation.RequestParam("url") String url);
 }

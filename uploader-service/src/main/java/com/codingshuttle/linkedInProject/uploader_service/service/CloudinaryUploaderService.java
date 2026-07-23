@@ -26,4 +26,37 @@ public class CloudinaryUploaderService implements UploaderService{
         }
 
     }
+
+    @Override
+    public void delete(String url) {
+        String publicId = publicIdFromUrl(url);
+        if (publicId == null) {
+            log.warn("could not derive a Cloudinary public id from url {}, skipping delete", url);
+            return;
+        }
+        try {
+            cloudinary.uploader().destroy(publicId, Map.of());
+            log.info("deleted Cloudinary asset {}", publicId);
+        } catch (IOException e) {
+            // Compensation is best-effort; surface as unchecked so the caller
+            // can decide, but never let it corrupt the delete flow silently.
+            throw new RuntimeException("Cloudinary delete failed for " + publicId, e);
+        }
+    }
+
+    /**
+     * Cloudinary secure_url looks like
+     *   https://res.cloudinary.com/&lt;cloud&gt;/image/upload/v123456/&lt;publicId&gt;.&lt;ext&gt;
+     * The public id is everything after the version segment, minus the extension.
+     */
+    private String publicIdFromUrl(String url) {
+        if (url == null) return null;
+        int uploadIdx = url.indexOf("/upload/");
+        if (uploadIdx < 0) return null;
+
+        String tail = url.substring(uploadIdx + "/upload/".length());
+        tail = tail.replaceFirst("^v\\d+/", "");           // strip the version segment
+        int dot = tail.lastIndexOf('.');
+        return dot > 0 ? tail.substring(0, dot) : tail;    // strip the extension
+    }
 }

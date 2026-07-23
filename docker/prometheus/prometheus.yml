@@ -1,0 +1,47 @@
+# Prometheus scrapes the app services, which run on the HOST (not in compose),
+# via host.docker.internal. Each service has its own job because the actuator
+# path differs: every service except the gateway and discovery server mounts
+# under a servlet context-path, so /actuator lives beneath it.
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]   # Prometheus itself, inside the container
+
+  - job_name: api-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9090"]
+
+  - job_name: discover-server
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8761"]
+
+  - job_name: user-service
+    metrics_path: /users/actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9020"]
+
+  - job_name: posts-service
+    metrics_path: /posts/actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9010"]
+
+  - job_name: connections-service
+    metrics_path: /connections/actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9030"]
+
+  - job_name: notification-service
+    metrics_path: /notifications/actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9040"]
+
+  - job_name: uploader-service
+    metrics_path: /uploads/actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9050"]

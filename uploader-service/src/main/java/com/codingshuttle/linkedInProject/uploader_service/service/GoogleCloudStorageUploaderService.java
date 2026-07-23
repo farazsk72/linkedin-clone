@@ -30,4 +30,11 @@ public class GoogleCloudStorageUploaderService implements UploaderService{
         }
         return String.format("https://storage.googleapis.com/%s/%s", bucketName, fileName);
     }
+
+    @Override
+    public void delete(String url) {
+        String prefix = String.format("https://storage.googleapis.com/%s/", bucketName);
+        if (url == null || !url.startsWith(prefix)) return;
+        storage.delete(bucketName, url.substring(prefix.length()));
+    }
 }

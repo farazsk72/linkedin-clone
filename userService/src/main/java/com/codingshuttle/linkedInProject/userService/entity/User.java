@@ -22,4 +22,17 @@ public class User {
 
     @Column(nullable = false)
     private String password;
+
+    // Profile fields. All optional - existing accounts and fresh signups both
+    // start with them null.
+    private String headline;
+
+    @Column(length = 2000)
+    private String about;
+
+    private String avatarUrl;
+
+    private String location;
+
+    private String currentCompany;
 }

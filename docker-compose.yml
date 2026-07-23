@@ -1,0 +1,120 @@
+# Local infrastructure for running the microservices outside Kubernetes.
+#
+#   docker compose up -d
+#
+# Postgres is NOT included - the services point at the host's Postgres on 5432.
+# See README-local-dev.md for the credentials they expect.
+#
+# Observability stack (the three signals + dashboards):
+#   Zipkin      http://localhost:9411  - distributed traces
+#   Prometheus  http://localhost:9099  - metrics (9090 is taken by the gateway)
+#   Loki        http://localhost:3100  - aggregated logs (Promtail ships them)
+#   Grafana     http://localhost:3000  - dashboards (admin/admin); Prometheus + Loki pre-wired,
+#                                        log lines link to their Zipkin trace
+# The app services run on the HOST, so Prometheus scrapes them through
+# host.docker.internal; each job's metrics_path carries the service context-path.
+services:
+  neo4j:
+    image: neo4j:5
+    container_name: linkedin-neo4j
+    ports:
+      - "7474:7474"   # browser UI
+      - "7687:7687"   # bolt - matches spring.neo4j.uri in ConnectionsService
+    environment:
+      # Must match spring.neo4j.authentication.* in ConnectionsService
+      NEO4J_AUTH: neo4j/password
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: linkedin-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Single-node KRaft cluster - no Zookeeper needed.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Single broker, so every replication factor has to be 1.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: linkedin-zipkin
+    ports:
+      - "9411:9411"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: linkedin-prometheus
+    # 9099 on the host - 9090 belongs to the API gateway.
+    ports:
+      - "9099:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    # So the container can reach services running on the host. Docker Desktop
+    # maps this automatically; the mapping keeps it working on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: linkedin-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml   # the image's built-in single-node config
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    container_name: linkedin-promtail
+    # Tails the host log files the services write, ships them to Loki.
+    volumes:
+      - ./logs:/var/log/app:ro
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: linkedin-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Single-user local tool - no need to nag for a password change.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+
+volumes:
+  neo4j-data:
+  kafka-data:
+  grafana-data:

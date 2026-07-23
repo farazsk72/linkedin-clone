@@ -11,7 +11,6 @@ import com.codingshuttle.linkedInProject.postsService.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +22,7 @@ public class PostLikeService {
     private final PostLikeRepository postLikeRepository;
     private final PostRepository postRepository;
     private final ModelMapper modelMapper;
-    private final KafkaTemplate<Long, PostLiked> postLikedKafkaTemplate;
+    private final OutboxWriter outboxWriter;
 
     @Transactional
     public void likePost(Long postId) {
@@ -41,13 +40,15 @@ public class PostLikeService {
         postLike.setUserId(userId);
         postLikeRepository.save(postLike);
 
-//        TODO: send notification to the owner of the post
+        // Queue the notification in the outbox, in this same transaction: if
+        // the like commits the event is guaranteed to be delivered, and if the
+        // transaction rolls back the event rolls back with it.
         PostLiked postLiked = PostLiked.builder()
                 .postId(postId)
                 .likedByUserId(userId)
                 .ownerUserId(post.getUserId())
                 .build();
-        postLikedKafkaTemplate.send("post_liked_topic", postLiked);
+        outboxWriter.write("post_liked_topic", postId, postLiked);
     }
 
 
