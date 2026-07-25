@@ -98,7 +98,9 @@ docker compose up -d
 
 Neo4j on 7687 (`neo4j`/`password`), Kafka on 9092. Both are required: the
 network page is dead without Neo4j, and notifications never arrive without
-Kafka.
+Kafka. A Kafka UI is bundled at http://localhost:8090 for inspecting topics,
+messages, and consumer-group lag (it reaches the broker over an internal
+`linkedin-kafka:29092` listener; host clients still use `localhost:9092`).
 
 ### Observability (Actuator + Prometheus + Zipkin + Grafana)
 
@@ -112,6 +114,7 @@ reports to Zipkin.
 | Prometheus | http://localhost:9099 | 9090 is the gateway, so Prometheus is on 9099 |
 | Loki | http://localhost:3100 | aggregated logs; Promtail tails the services' log files |
 | Grafana | http://localhost:3000 | `admin`/`admin`; Prometheus + Loki pre-wired |
+| Kafka UI | http://localhost:8090 | browse topics, messages, and consumer-group lag |
 
 Each service writes `logs/<app-name>.log` (repo-root `logs/`, gitignored) in addition
 to stdout; Promtail ships those to Loki, labelled by `service`. In Grafana's Loki
