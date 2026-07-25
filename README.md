@@ -50,3 +50,7 @@ Then run the [frontend](https://github.com/farazsk72/linkedin-clone-frontend) an
 ## Tests
 
 `postsService` carries a JUnit 5 + Mockito + Testcontainers suite — saga compensation, outbox relay, hashtag/mention extraction, and a real-Postgres repository slice. See [README-local-dev.md](./README-local-dev.md) §4.
+
+## License
+
+Released under the [MIT License](./LICENSE).
