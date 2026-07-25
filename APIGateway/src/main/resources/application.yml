@@ -108,6 +108,19 @@ spring:
             - StripPrefix=2
             - name: AuthenticationFilter
 
+        # Serving previously-uploaded files back to the browser (local storage
+        # backend). GET only and unauthenticated, because an <img> tag cannot
+        # send an Authorization header. Must precede the uploader-service route
+        # below, which is a broader prefix that requires auth; the Method=GET
+        # predicate keeps the authenticated POST upload on that route.
+        - id: uploader-file-serve
+          uri: ${UPLOADER_SERVICE_URI:lb://UPLOADER-SERVICE}
+          predicates:
+            - Path=/api/v1/uploads/file/**
+            - Method=GET
+          filters:
+            - StripPrefix=2
+
         # Direct upload access, used for avatars. Post images take a different
         # path - postsService forwards those over Feign.
         - id: uploader-service

@@ -8,3 +8,6 @@
 /logs/*.log
 /logs/*.log.*
 /logs/*.gz
+
+# Local filesystem uploads (uploader.backend=local). Never commit stored files.
+**/uploads-data/

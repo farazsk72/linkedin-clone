@@ -5,6 +5,7 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -24,7 +25,10 @@ public class UploaderConfig {
     @Value("${cloudinary.api-secret}")
     private String apiSecret;
 
+    // Only build the Cloudinary client for the cloudinary backend (the default).
+    // Under the local/gcs backends the api-secret may be absent or a placeholder.
     @Bean
+    @ConditionalOnProperty(name = "uploader.backend", havingValue = "cloudinary", matchIfMissing = true)
     public Cloudinary cloudinary() {
         Map<String, String> config = Map.of(
                 "cloud_name", cloudName,
@@ -37,7 +41,11 @@ public class UploaderConfig {
     @Value("${gcloud.storage-access-key}")
     private String gcloudAccessKey;
 
+    // Only build the GCS client for the gcs backend. Eagerly parsing the
+    // service-account key otherwise would crash startup whenever the key is a
+    // placeholder (e.g. the dummy local profile).
     @Bean
+    @ConditionalOnProperty(name = "uploader.backend", havingValue = "gcs")
     public Storage storage() throws IOException {
         return StorageOptions.newBuilder()
                 .setCredentials(ServiceAccountCredentials.fromStream(

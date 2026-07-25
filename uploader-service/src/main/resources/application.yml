@@ -36,6 +36,20 @@ logging:
   pattern:
     level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
 
+# Which storage backend the uploader uses: cloudinary (default), gcs, or local.
+# The local backend writes to disk and needs no cloud credentials - handy for
+# local dev (see application-local.yml, which sets this to local).
+uploader:
+  backend: ${UPLOADER_BACKEND:cloudinary}
+
+# Local filesystem storage, used when uploader.backend=local. Files are written
+# under `dir` and served back at `public-base-url/<name>` (an unauthenticated
+# GET route on the gateway) so an <img> tag can load them.
+upload:
+  local:
+    dir: ${UPLOAD_LOCAL_DIR:./uploads-data}
+    public-base-url: ${UPLOAD_LOCAL_PUBLIC_BASE_URL:/api/v1/uploads/file}
+
 # Cloud-name and api-key are public identifiers, not secrets. The api-secret
 # and the GCP service-account key are supplied by the gitignored `local`
 # profile (application-local.yml) or by env vars in k8s - never committed here.
