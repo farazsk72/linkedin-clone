@@ -35,4 +35,9 @@ public class KafkaConfig {
     public NewTopic postReposted() {
         return new NewTopic("post_reposted_topic", 3, (short) 1);
     }
+
+    @Bean
+    public NewTopic userMentioned() {
+        return new NewTopic("user_mentioned_topic", 3, (short) 1);
+    }
 }

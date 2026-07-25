@@ -35,6 +35,33 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+		<!-- STOMP-over-WebSocket, so a saved notification is pushed to the
+		     browser live instead of the navbar polling for it every 30s. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+		<!-- The WebSocket handshake bypasses the gateway's AuthenticationFilter
+		     (a browser cannot set an Authorization header on the upgrade), so
+		     this service validates the JWT itself on the STOMP CONNECT frame.
+		     Same jjwt version the gateway and userService use. -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.12.6</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.12.6</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.12.6</version>
+			<scope>runtime</scope>
+		</dependency>
 		<!-- Observability: Actuator + Prometheus metrics + Zipkin distributed tracing -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -84,6 +111,13 @@
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- In-memory DB for the WebSocket integration test, which boots the real
+		     app context (minus Kafka/Eureka) to exercise the live push path. -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

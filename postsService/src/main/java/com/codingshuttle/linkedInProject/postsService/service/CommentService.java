@@ -6,6 +6,7 @@ import com.codingshuttle.linkedInProject.postsService.dto.CommentDto;
 import com.codingshuttle.linkedInProject.postsService.entity.Comment;
 import com.codingshuttle.linkedInProject.postsService.entity.Post;
 import com.codingshuttle.linkedInProject.postsService.event.PostCommented;
+import com.codingshuttle.linkedInProject.postsService.event.UserMentioned;
 import com.codingshuttle.linkedInProject.postsService.exception.BadRequestException;
 import com.codingshuttle.linkedInProject.postsService.exception.ResourceNotFoundException;
 import com.codingshuttle.linkedInProject.postsService.entity.CommentLike;
@@ -77,6 +78,20 @@ public class CommentService {
                     .ownerUserId(post.getUserId())
                     .commentedByUserId(userId)
                     .content(comment.getContent())
+                    .build());
+        }
+
+        // Notify anyone @mentioned in the comment. Skip the commenter, and skip
+        // the post owner when they were already told above, so a mention does
+        // not double-notify on top of the comment notification.
+        for(Long mentionedUserId : MentionExtractor.extract(comment.getContent())) {
+            if(mentionedUserId.equals(userId)) continue;
+            if(mentionedUserId.equals(post.getUserId())) continue;
+            outboxWriter.write("user_mentioned_topic", postId, UserMentioned.builder()
+                    .mentionedUserId(mentionedUserId)
+                    .mentionedByUserId(userId)
+                    .postId(postId)
+                    .context("COMMENT")
                     .build());
         }
 

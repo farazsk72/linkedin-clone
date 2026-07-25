@@ -6,9 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     boolean existsByUserIdAndPostId(Long userId, Long postId);
+
+    /** The caller's single reaction on a post, if any - the upsert reads this. */
+    Optional<PostLike> findByUserIdAndPostId(Long userId, Long postId);
 
     long countByPostId(Long postId);
 
@@ -25,4 +29,14 @@ public interface PostLikeRepository extends JpaRepository<PostLike, Long> {
     /** Which of these posts the user has liked. */
     @Query("select pl.postId from PostLike pl where pl.userId = :userId and pl.postId in :ids")
     List<Long> findLikedPostIds(@Param("userId") Long userId, @Param("ids") List<Long> ids);
+
+    /** [postId, type, count] rows: the per-type reaction breakdown for the posts. */
+    @Query("select pl.postId, pl.type, count(pl) from PostLike pl "
+            + "where pl.postId in :ids group by pl.postId, pl.type")
+    List<Object[]> reactionCountsByPostIdIn(@Param("ids") List<Long> ids);
+
+    /** [postId, type] rows: the caller's own reaction on each of these posts. */
+    @Query("select pl.postId, pl.type from PostLike pl "
+            + "where pl.userId = :userId and pl.postId in :ids")
+    List<Object[]> findMyReactions(@Param("userId") Long userId, @Param("ids") List<Long> ids);
 }

@@ -118,6 +118,18 @@ spring:
             - StripPrefix=2
             - name: AuthenticationFilter
 
+        # WebSocket handshake for live notifications. Must be declared BEFORE the
+        # notification-service route below, since it is a more specific prefix of
+        # the same path. Deliberately carries NO AuthenticationFilter: a browser
+        # cannot set an Authorization header on the WS upgrade, so the JWT is
+        # validated on the STOMP CONNECT frame inside notification-service.
+        - id: notification-ws
+          uri: ${NOTIFICATION_SERVICE_URI:lb://NOTIFICATION-SERVICE}
+          predicates:
+            - Path=/api/v1/notifications/ws/**
+          filters:
+            - StripPrefix=2
+
         - id: notification-service
           uri: ${NOTIFICATION_SERVICE_URI:lb://NOTIFICATION-SERVICE}
           predicates:

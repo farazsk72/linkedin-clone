@@ -24,6 +24,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
+    private final NotificationPushService pushService;
 
     public List<Notification> getNotificationsOfCurrentUser() {
         Long userId = AuthContextHolder.getCurrentUserId();
@@ -90,7 +91,7 @@ public class NotificationService {
 
     /** The types a user can mute. Anything not listed here is always delivered. */
     public static final List<String> MUTABLE_TYPES =
-            List.of("POST_CREATED", "POST_LIKED", "POST_COMMENTED", "POST_REPOSTED");
+            List.of("POST_CREATED", "POST_LIKED", "POST_COMMENTED", "POST_REPOSTED", "USER_MENTIONED");
 
     public List<NotificationPreferenceDto> getPreferences() {
         Long userId = AuthContextHolder.getCurrentUserId();
@@ -142,7 +143,12 @@ public class NotificationService {
         }
 
         log.info("Adding notification to db, message: {}", notification.getMessage());
-        notification = notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+
+        // Push it live so the recipient's navbar updates without waiting for the
+        // next poll. Delivery is best-effort inside pushToUser.
+        long unread = notificationRepository.countByUserIdAndReadFalse(saved.getUserId());
+        pushService.pushToUser(saved, unread);
 
 //        SendMailer to send email
 //        FCM

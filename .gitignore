@@ -4,4 +4,7 @@
 **/src/main/resources/application-local.yaml
 
 # Aggregated log files (shipped to Loki), keep the dir but not the logs.
+# Covers live logs and rotated/gzipped ones (e.g. posts-service.log.2026-07-23.0.gz).
 /logs/*.log
+/logs/*.log.*
+/logs/*.gz

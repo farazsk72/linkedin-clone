@@ -70,6 +70,7 @@ public class PostCreationSaga {
             failIfRequested(failAt, "PUBLISH");
             if (PUBLISHED.equals(post.getStatus())) {
                 eventPublisher.notifyConnections(post, userId);
+                eventPublisher.notifyMentions(post, userId);
             }
 
             log.info("post-creation saga completed for post {}", post.getId());

@@ -146,8 +146,9 @@ public class PostService {
         post.setStatus(PUBLISHED);
         post = postRepository.saveAndFlush(post);
 
-        // Connections are told now, not when the draft was written.
+        // Connections and mentioned users are told now, not when the draft was written.
         eventPublisher.notifyConnections(post, userId);
+        eventPublisher.notifyMentions(post, userId);
 
         return toDto(post, userId);
     }
@@ -382,8 +383,16 @@ public class PostService {
 
     private PostDto buildDto(Post post, Aggregates agg) {
         PostDto dto = modelMapper.map(post, PostDto.class);
-        dto.setLikeCount(agg.likeCounts().getOrDefault(post.getId(), 0L));
-        dto.setLikedByMe(agg.likedIds().contains(post.getId()));
+
+        Map<String, Long> reactions = agg.reactionBreakdown().getOrDefault(post.getId(), Map.of());
+        dto.setReactionCounts(reactions);
+        // likeCount stays the total across every reaction type, so existing
+        // callers reading it keep seeing the full engagement number.
+        dto.setLikeCount(reactions.values().stream().mapToLong(Long::longValue).sum());
+        String myReaction = agg.myReactions().get(post.getId());
+        dto.setMyReaction(myReaction);
+        dto.setLikedByMe(myReaction != null);
+
         dto.setCommentCount(agg.commentCounts().getOrDefault(post.getId(), 0L));
         dto.setSavedByMe(agg.savedIds().contains(post.getId()));
         dto.setHashtags(agg.hashtags().getOrDefault(post.getId(), List.of()));
@@ -393,18 +402,30 @@ public class PostService {
     /** Every per-post signal for a set of ids, loaded in one query each. */
     private Aggregates loadAggregates(Set<Long> ids, Long currentUserId) {
         if(ids.isEmpty()) {
-            return new Aggregates(Map.of(), Set.of(), Map.of(), Set.of(), Map.of());
+            return new Aggregates(Map.of(), Map.of(), Map.of(), Set.of(), Map.of());
         }
         List<Long> idList = new ArrayList<>(ids);
 
-        Map<Long, Long> likeCounts = toCountMap(postLikeRepository.countByPostIdIn(idList));
+        // Per-type reaction breakdown; likeCount and likedByMe are derived from
+        // this in buildDto, so the old count/likedIds queries are not needed.
+        Map<Long, Map<String, Long>> reactionBreakdown = new HashMap<>();
+        for(Object[] row : postLikeRepository.reactionCountsByPostIdIn(idList)) {
+            Long postId = ((Number) row[0]).longValue();
+            String type = String.valueOf(row[1]);
+            Long count = ((Number) row[2]).longValue();
+            reactionBreakdown.computeIfAbsent(postId, (k) -> new HashMap<>()).put(type, count);
+        }
+
         Map<Long, Long> commentCounts = toCountMap(commentRepository.countByPostIdIn(idList));
 
         // Skip the "mine" queries entirely for an unauthenticated read - matches
         // the old `currentUserId != null && ...` guard.
-        Set<Long> likedIds = currentUserId == null
-                ? Set.of()
-                : new HashSet<>(postLikeRepository.findLikedPostIds(currentUserId, idList));
+        Map<Long, String> myReactions = new HashMap<>();
+        if(currentUserId != null) {
+            for(Object[] row : postLikeRepository.findMyReactions(currentUserId, idList)) {
+                myReactions.put(((Number) row[0]).longValue(), String.valueOf(row[1]));
+            }
+        }
         Set<Long> savedIds = currentUserId == null
                 ? Set.of()
                 : new HashSet<>(savedPostRepository.findSavedPostIds(currentUserId, idList));
@@ -414,7 +435,7 @@ public class PostService {
             hashtags.computeIfAbsent(row.getPostId(), (k) -> new ArrayList<>()).add(row.getTag());
         }
 
-        return new Aggregates(likeCounts, likedIds, commentCounts, savedIds, hashtags);
+        return new Aggregates(reactionBreakdown, myReactions, commentCounts, savedIds, hashtags);
     }
 
     private Map<Long, Long> toCountMap(List<Object[]> rows) {
@@ -426,8 +447,8 @@ public class PostService {
     }
 
     private record Aggregates(
-            Map<Long, Long> likeCounts,
-            Set<Long> likedIds,
+            Map<Long, Map<String, Long>> reactionBreakdown,
+            Map<Long, String> myReactions,
             Map<Long, Long> commentCounts,
             Set<Long> savedIds,
             Map<Long, List<String>> hashtags) {

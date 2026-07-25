@@ -6,6 +6,7 @@ import com.codingshuttle.linkedInProject.postsService.event.PostCommented;
 import com.codingshuttle.linkedInProject.postsService.event.PostCreated;
 import com.codingshuttle.linkedInProject.postsService.event.PostLiked;
 import com.codingshuttle.linkedInProject.postsService.event.PostReposted;
+import com.codingshuttle.linkedInProject.postsService.event.UserMentioned;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -37,8 +38,9 @@ public class PostsConsumer {
     public void handlePostLiked(PostLiked postLiked) {
         log.info("handlePostLiked: {}", postLiked);
 
-        String message = String.format("User with id: %d has liked your post with id: %d",
-                postLiked.getLikedByUserId(), postLiked.getPostId());
+        String message = String.format("User with id: %d %s your post with id: %d",
+                postLiked.getLikedByUserId(), reactionVerb(postLiked.getReactionType()),
+                postLiked.getPostId());
 
         Notification notification = Notification.builder()
                 .message(message)
@@ -47,6 +49,35 @@ public class PostsConsumer {
                 .targetId(postLiked.getPostId())
                 .build();
         notificationService.addNotification(notification);
+    }
+
+    @KafkaListener(topics = "user_mentioned_topic")
+    public void handleUserMentioned(UserMentioned userMentioned) {
+        log.info("handleUserMentioned: {}", userMentioned);
+
+        String where = "COMMENT".equals(userMentioned.getContext()) ? "a comment" : "a post";
+        String message = String.format("User with id: %d mentioned you in %s (post id: %d)",
+                userMentioned.getMentionedByUserId(), where, userMentioned.getPostId());
+
+        Notification notification = Notification.builder()
+                .message(message)
+                .userId(userMentioned.getMentionedUserId())
+                .type("USER_MENTIONED")
+                .targetId(userMentioned.getPostId())
+                .build();
+        notificationService.addNotification(notification);
+    }
+
+    /** Phrasing for each reaction. Null (older events) reads as a plain like. */
+    private String reactionVerb(String reactionType) {
+        if (reactionType == null) return "has liked";
+        return switch (reactionType) {
+            case "CELEBRATE" -> "celebrated";
+            case "SUPPORT" -> "supported";
+            case "INSIGHTFUL" -> "found insightful";
+            case "FUNNY" -> "laughed at";
+            default -> "has liked";
+        };
     }
 
     @KafkaListener(topics = "post_commented_topic")
