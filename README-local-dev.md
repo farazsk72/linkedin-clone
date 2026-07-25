@@ -1,6 +1,6 @@
 # Running the stack locally
 
-The frontend lives in a sibling folder: `../linkedInProject FD`.
+The frontend lives in a sibling folder (`../linkedInProject FD`) and in its own repo: **[linkedin-clone-frontend](https://github.com/farazsk72/linkedin-clone-frontend)**.
 
 ## 1. Prerequisites
 
@@ -72,22 +72,23 @@ Create those three files, then start those services with the profile active:
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-### Uploader credentials — required
+### Uploader storage backend
 
-The Cloudinary API secret and the GCP service-account key used to be committed
-in `uploader-service/application.yml`. They are now supplied only by the
-gitignored `uploader-service/src/main/resources/application-local.yml` (or by
-`CLOUDINARY_API_SECRET` / `GCLOUD_STORAGE_ACCESS_KEY` env vars). uploader-service
-builds its GCP client at startup, so it **must run with the `local` profile**
-(or those env vars) or it will not start.
+uploader-service supports three storage backends via `uploader.backend`:
+`cloudinary` (default), `gcs`, or `local`. For local development the easiest
+path needs **no cloud credentials** — set `uploader.backend=local` (the
+gitignored `application-local.yml` already does this) and uploads are written to
+`uploader-service/uploads-data/` and served back through the gateway's
+unauthenticated `GET /api/v1/uploads/file/**` route.
 
-**Those credentials are burned** — they lived in git history, so rotate them:
-regenerate the Cloudinary API secret, and disable+reissue the GCP key. Then put
-the new values in the local file; nothing else changes.
+For the cloud backends the secrets come only from the gitignored
+`application-local.yml` (or `CLOUDINARY_API_SECRET` / `GCLOUD_STORAGE_ACCESS_KEY`
+env vars) — never committed. The previously-committed values were removed and
+scrubbed from git history; if you ever reuse the old keys, rotate them first.
 
-Without the profile they fall back to placeholder defaults and fail to start.
-Everything is overridable by environment variable — `DB_SERVER`, `DB_PORT`,
-`DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` — the same names the `k8s` profile uses.
+DB connection settings are likewise overridable by environment variable —
+`DB_SERVER`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` — the same names
+the `k8s` profile uses.
 
 ### Neo4j and Kafka
 
@@ -438,9 +439,10 @@ Two accounts in separate browser profiles:
   auto-create it with `num.partitions=1`, and the group then keeps that stale
   single-partition assignment after the owning service widens the topic to 3.
 
-- **Secrets are committed.** `uploader-service/src/main/resources/application.yml`
-  contains a live Cloudinary `api-secret` and a full GCP service-account private
-  key. They are in git history and should be rotated.
+- **Uploader secrets are no longer committed.** The previously-committed
+  Cloudinary/GCP values were removed from the current tree and scrubbed from git
+  history. Real credentials now come from the gitignored local profile or env
+  vars, and a credential-free `local` disk backend is available for development.
 - The JWT secret is duplicated in `APIGateway` and `userService` configs.
 - Tokens last 100 minutes with no refresh endpoint; the frontend redirects to
   `/login` on the resulting 401.
